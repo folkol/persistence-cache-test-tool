@@ -12,10 +12,9 @@ import com.polopoly.service.cm.standard.content.StdContentTransfer;
 import com.polopoly.service.cm.standard.content.StdVersionInfo;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
 
 import static java.lang.Integer.parseInt;
+import static java.util.UUID.randomUUID;
 
 /**
  * <p>Naïve performance cache benchmark.</p>
@@ -71,11 +70,11 @@ public class CacheThroughputTest {
     }
 
     private static void printUsage() {
-        System.err.println("usage: java -jar persistence-cache-test.jar /path/to/cache [num_content]");
+        System.err.println("usage: java -jar persistence-test.jar /path/to/cache [num_content]");
         System.exit(1);
     }
 
-    private static void performTest(ContentStorageLocalDisk cache, int numContent) throws IOException {
+    private static void performTest(ContentStorageLocalDisk cache, int numContent) {
         long writeStart = System.nanoTime();
         writeTest(numContent, cache);
         double writeElapsed = (System.nanoTime() - writeStart) / 1e9;
@@ -125,10 +124,10 @@ public class CacheThroughputTest {
     }
 
     private static StdContentData createContentData(RealContentId rcid) {
-        StdContentData contentData = new StdContentData(rcid);
-        contentData.setComponent(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString());
-        contentData.setComponent(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString());
-        contentData.setComponent("foo", "bar", BACON);
-        return contentData;
+        StdContentData scd = new StdContentData(rcid);
+        scd.setComponent(randomUUID().toString(), randomUUID().toString(), randomUUID().toString());
+        scd.setComponent(randomUUID().toString(), randomUUID().toString(), randomUUID().toString());
+        scd.setComponent("foo", "bar", BACON);
+        return scd;
     }
 }
