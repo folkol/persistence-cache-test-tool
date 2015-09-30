@@ -12,29 +12,50 @@ import com.polopoly.service.cm.standard.content.StdContentTransfer;
 import com.polopoly.service.cm.standard.content.StdVersionInfo;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import static java.lang.Integer.parseInt;
 
 /**
- * Naïve performance cache benchmark.
+ * <p>Naïve performance cache benchmark.</p>
  *
- * It will use the ContentStorageLocalDisk to write n number of ContentTransfers.
+ * <p>It will use the ContentStorageLocalDisk to write n number of ContentTransfers,
+ * containing a few random smaller components and one large component.</p>
  *
- * This may, or may not, reflect the performance of a real persistence cache.
+ * <p>(This may, or may not, reflect the performance of a real persistence cache.)</p>
  */
 public class CacheThroughputTest {
 
     public static final StdRealContentId PRINCIPAL_RID = new StdRealContentId(18, 10, 100);
     public static final String DONE_COLOR = "\t\t\u001B[32mDone!\u001B[0m";
+    public static final String BACON =
+            "Bacon ipsum dolor amet fatback shoulder pig salami, turkey biltong ham\n" +
+            "hock cow sirloin flank bacon tail jerky. Kevin brisket shank pork chop\n" +
+            "meatball salami rump shankle ribeye ball tip picanha. Doner turducken\n" +
+            "kevin, jowl shoulder spare ribs corned beef biltong ham hock boudin\n" +
+            "brisket pork chop capicola rump prosciutto. Tri-tip tail hamburger\n" +
+            "jerky ball tip. Turkey capicola filet mignon tail cow ham hock\n" +
+            "meatball.\n" +
+            "\n" +
+            "Pork loin frankfurter jerky shankle doner venison meatloaf boudin\n" +
+            "landjaeger prosciutto kevin porchetta. Fatback swine t-bone leberkas\n" +
+            "salami ball tip pork. Hamburger pork fatback, shankle flank landjaeger\n" +
+            "swine sausage chicken short ribs strip steak jerky salami. Drumstick\n" +
+            "tongue ball tip strip steak.\n" +
+            "\n" +
+            "Pork belly kevin shoulder bresaola salami, t-bone ham alcatra chicken\n" +
+            "tri-tip. Fatback pancetta prosciutto drumstick jowl frankfurter turkey\n" +
+            "spare ribs landjaeger. Pork loin pig meatloaf shank picanha shankle\n" +
+            "landjaeger leberkas beef ribs beef chuck t-bone. Pig fatback swine\n" +
+            "salami pancetta. Short ribs pork shank turducken.";
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1 || args.length > 2) {
             printUsage();
         }
 
-        int numContent = 10000;
+        int numContent = 100000;
         String cachePath = args[0];
 
         if (args.length == 2) {
@@ -45,7 +66,8 @@ public class CacheThroughputTest {
             }
         }
 
-        performTest(cachePath, numContent);
+        ContentStorageLocalDisk cache = new ContentStorageLocalDisk(new File(cachePath));
+        performTest(cache, numContent);
     }
 
     private static void printUsage() {
@@ -53,28 +75,34 @@ public class CacheThroughputTest {
         System.exit(1);
     }
 
-    private static void performTest(String cacheLocation, int numContent) throws IOException {
-        ContentStorageLocalDisk cache = new ContentStorageLocalDisk(new File(cacheLocation));
-
-        System.out.printf("Writing x %d...", numContent);
+    private static void performTest(ContentStorageLocalDisk cache, int numContent) throws IOException {
         long writeStart = System.nanoTime();
-        for (int i = 1; i < numContent; i++) {
-            cache.store(getContentTransfer(new StdRealContentId(1, i, 100), PRINCIPAL_RID));
-            cache.sync();
-        }
+        writeTest(numContent, cache);
         double writeElapsed = (System.nanoTime() - writeStart) / 1e9;
-        System.out.println(DONE_COLOR);
 
-        System.out.printf("Reading x %d... ", numContent);
         long readStart = System.nanoTime();
-        for (int i = 1; i < numContent; i++) {
-            cache.loadContentData(new StdRealContentId(1, i, 100));
-        }
-        System.out.println(DONE_COLOR);
+        readTest(numContent, cache);
         double readElapsed = (System.nanoTime() - readStart) / 1e9;
 
         System.out.printf("Writes per second:\t%13.2f%n", numContent / writeElapsed);
         System.out.printf("Reads per second:\t%13.2f%n", numContent / readElapsed);
+    }
+
+    private static void readTest(int numContent, ContentStorageLocalDisk cache) {
+        System.out.printf("Reading x %d... ", numContent);
+        for (int i = 1; i < numContent; i++) {
+            cache.loadContentData(new StdRealContentId(1, i, 100));
+        }
+        System.out.println(DONE_COLOR);
+    }
+
+    private static void writeTest(int numContent, ContentStorageLocalDisk cache) {
+        System.out.printf("Writing x %d...", numContent);
+        for (int i = 1; i < numContent; i++) {
+            cache.store(getContentTransfer(new StdRealContentId(1, i, 100), PRINCIPAL_RID));
+            cache.sync();
+        }
+        System.out.println(DONE_COLOR);
     }
 
     static ContentTransfer getContentTransfer(RealContentId rcid, RealContentId pcid) {
@@ -93,6 +121,14 @@ public class CacheThroughputTest {
                 rcid.getCommitId() + (long) (rcid.getMinor() * 1000),
                 "principal_3",
                 pcid);
-        return new StdContentTransfer(rcid, cinfo, vinfo, new StdContentData(rcid), StatusCode.OK);
+        return new StdContentTransfer(rcid, cinfo, vinfo, createContentData(rcid), StatusCode.OK);
+    }
+
+    private static StdContentData createContentData(RealContentId rcid) {
+        StdContentData contentData = new StdContentData(rcid);
+        contentData.setComponent(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        contentData.setComponent(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        contentData.setComponent("foo", "bar", BACON);
+        return contentData;
     }
 }
